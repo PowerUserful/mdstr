@@ -130,33 +130,29 @@ async function processSingleCommand(supabase: any, cmd: any) {
 // ============================================
 
 async function validateCommandDeterministic(supabase: any, cmd: any, raw: string) {
-  const { data: currentRoom } = await supabase
-    .from("rooms")
-    .select("id, name, region, structure_id")
-    .eq("id", cmd.room_id)
-    .single();
+  // TODO: Expand this significantly for MudStar
+  // Examples of checks you should implement:
+  // - Movement: Does an exit exist in that direction from current room (or structure)?
+  // - dock/undock: Is the player in a ship? Is there a station in the current room?
+  // - discover: Is the current room marked as "edge of known space" or has a discoverable flag?
+  // - trade: Is there a trading terminal/NPC in this room?
+  // - attack: Is there a valid target in range?
 
-  const parts = raw.split(" ");
-  const verb = parts[0];
+  // Placeholder implementation - accept most commands for now
+  // You will replace this with real checks against rooms, exits, structures, characters, etc.
 
-  // Example validations
-  if (["north", "south", "east", "west", "dock", "undock", "back"].includes(verb)) {
-    const { data: exits } = await supabase
-      .from("exits")
-      .select("id")
-      .eq("from_room", cmd.room_id)
-      .eq("verb", verb)
-      .limit(1);
-    if (!exits?.length) {
-      return { valid: false, errorMessage: `No exit "${verb}" from here.` };
-    }
+  if (raw === "discover") {
+    // Example: Only allow discover from certain rooms
+    const { data: room } = await supabase
+      .from("rooms")
+      .select("id, region, structure_id")
+      .eq("id", cmd.room_id)
+      .single();
+
+    // For now, allow discover everywhere as a starting point.
+    // Later you can add: if (!room.allow_discover) return { valid: false, errorMessage: "There is nothing new to discover here." };
   }
 
-  if (verb === "discover") {
-    // Optional: room-specific checks later
-  }
-
-  // Add more (trade, attack, etc.) as you implement handlers
   return { valid: true };
 }
 
@@ -312,84 +308,35 @@ async function applyDiscoverResult(supabase: any, cmd: any, parsed: any) {
 // ============================================
 
 async function handleDeterministicCommand(supabase: any, cmd: any, raw: string) {
-  const parts = raw.trim().toLowerCase().split(/\s+/);
-  const verb = parts[0];
+  // TODO: Implement real handlers for:
+  // - look, who, say, whisper, talk <npc>
+  // - movement (north, south, dock, etc.) using exits table
+  // - dock / undock (using structures)
+  // - scan, trade, attack, cargo, etc.
 
-  if (verb === "look" || verb === "l") {
-    await handleLookCommand(supabase, cmd);
-  } else if (["north", "south", "east", "west", "dock", "undock", "back"].includes(verb)) {
-    await handleMovementCommand(supabase, cmd, verb);
-  } else if (verb === "scan") {
-    await handleScanCommand(supabase, cmd);
+  // Placeholder for now
+  if (raw === "look") {
+    const { data: room } = await supabase
+      .from("rooms")
+      .select("name, description")
+      .eq("id", cmd.room_id)
+      .single();
+
+    await insertRoomMessage(
+      supabase,
+      cmd.room_id,
+      "system",
+      `You are in ${room?.name || "unknown location"}.\n${room?.description || "No description available."}`
+    );
   } else {
+    // Unknown command that passed validation
     await insertRoomMessage(
       supabase,
       cmd.room_id,
       "error",
-      `Command "${raw}" is not yet fully implemented.`
+      `Command "${raw}" is not yet implemented in deterministic mode.`
     );
   }
-}
-
-// Helper functions (add these)
-async function handleLookCommand(supabase: any, cmd: any) {
-  const { data: room } = await supabase
-    .from("rooms")
-    .select("name, description, structure_id, region_name")
-    .eq("id", cmd.room_id)
-    .single();
-
-  let extra = "";
-  if (room.structure_id) {
-    const { data: structure } = await supabase
-      .from("structures")
-      .select("name, type")
-      .eq("id", room.structure_id)
-      .single();
-    extra = `\nYou are inside the ${structure?.type || 'structure'}: ${structure?.name}.`;
-  }
-
-  await insertRoomMessage(
-    supabase,
-    cmd.room_id,
-    "system",
-    `You are in ${room?.name || "unknown location"}.\n${room?.description || "No description available."}${extra}`
-  );
-}
-
-async function handleMovementCommand(supabase: any, cmd: any, direction: string) {
-  const { data: exit } = await supabase
-    .from("exits")
-    .select("to_room")
-    .eq("from_room", cmd.room_id)
-    .eq("verb", direction)
-    .single();
-
-  if (!exit) {
-    await insertRoomMessage(supabase, cmd.room_id, "error", `Cannot go ${direction} here.`);
-    return;
-  }
-
-  // Update character location
-  await supabase
-    .from("characters")
-    .update({ current_room: exit.to_room })
-    .eq("id", cmd.character_id);
-
-  // Trigger look in new room
-  await handleLookCommand(supabase, { ...cmd, room_id: exit.to_room });
-}
-
-async function handleScanCommand(supabase: any, cmd: any) {
-  // Simple scan: nearby in region or structure
-  const { data: room } = await supabase
-    .from("rooms")
-    .select("region, structure_id")
-    .eq("id", cmd.room_id)
-    .single();
-
-  // Expand with structures/NPCs in same region later
-  await insertRoomMessage(supabase, cmd.room_id, "system", "Scan complete. No immediate threats detected. (Expand this!)");
 }
 
 // ============================================

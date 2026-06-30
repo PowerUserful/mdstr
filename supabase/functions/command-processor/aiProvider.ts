@@ -100,7 +100,7 @@ interface ChatCompletionOptions {
 export async function createChatCompletion({
   messages,
   modelType = "fast",
-  maxTokens = 500,
+  maxTokens = 1200,
   temperature = 0.8,
   responseFormat = undefined,
 }: ChatCompletionOptions) {
