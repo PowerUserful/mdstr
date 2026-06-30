@@ -2,10 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  experimental: {
-    esmExternals: 'loose',
-  },
-  turbopack: {},
+  // Remove esmExternals for Turbopack compatibility
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
